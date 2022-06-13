@@ -12,11 +12,13 @@ import random
 from numpy import argwhere, linalg as LNG
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
-
+from sklearn.metrics import silhouette_samples,silhouette_score
+import numpy as np
+import matplotlib.style as style
 mat = sio.loadmat('esqueletosveryslow.mat')
 mat_complete = sio.loadmat('esqueletosveryslow_complete.mat')
 data = sio.loadmat('girosmallveryslow2.mp4_features.mat')
-data = np.double(data['features'])
+features = np.double(data['features'])
 filename = "girosmallveryslow2.mp4"
 
 #%% Define functions
@@ -40,14 +42,14 @@ def findSimilar(base,data,case):
         similar=sorted[:100]
     return similar, outliers
 
-def plotimages(similar):
+def plotimages(similar,grid):
     cap = cv2.VideoCapture(filename) #video_name is the video being called
     plt.figure(figsize = (20,20))
     i=1
     for frames in similar:
         cap.set(1,frames); # Where frame_no is the frame you want
         ret, frame = cap.read() # Read the frame
-        plt.subplot(4, 4, i)
+        plt.subplot(grid, grid, i)
         plt.imshow(frame)
         
         i +=1
@@ -57,9 +59,9 @@ def plot_scelframe(frame_nr):
     get_start_nr=np.argwhere(frame_num_c==frame_nr)
     i=get_start_nr[0]
     #i=11
-    while frame_num_c[i]==2:    
+    while frame_num_c[i]==frame_nr:    
         cap = cv2.VideoCapture(filename)
-        cap.set(1,frame_num_c[i])
+        cap.set(1,int(frame_num_c[i]))
         ret, frame = cap.read()
         plt.imshow(frame)
         plt.scatter(x_c[:,i],y_c[:,i],c='r')
@@ -67,11 +69,52 @@ def plot_scelframe(frame_nr):
         plt.pause(0.3)
         i+=1
 
+def elbow(clusters):
+    distortions = []
+    K = range(1,clusters)
+    for k in K:
+        kmeanModel = KMeans(n_clusters=k)
+        kmeanModel.fit(lowdim.T)
+        distortions.append(kmeanModel.inertia_)
+        print(k)
+    plt.figure(figsize=(16,8))
+    plt.plot(K, distortions, 'bx-')
+    plt.xlabel('k')
+    plt.ylabel('Distortion')
+    plt.title('The Elbow Method showing the optimal k')
+    plt.show()
+
+def silhouette(clusters,lowdim):
+    range_n_clusters = range(2,clusters)
+    silhouette_avg_n_clusters = []
+
+    for n_clusters in range_n_clusters:
+
+        clusterer = KMeans(n_clusters=n_clusters, random_state=42)
+        cluster_labels = clusterer.fit_predict(lowdim.T)
+
+        silhouette_avg = silhouette_score(lowdim.T, cluster_labels)
+        print("For n_clusters =", n_clusters,
+            "The average silhouette_score is :", silhouette_avg)
+
+        silhouette_avg_n_clusters.append(silhouette_avg)
+
+        sample_silhouette_values = silhouette_samples(lowdim.T, cluster_labels)
+
+
+
+    style.use("fivethirtyeight")
+    plt.plot(range_n_clusters, silhouette_avg_n_clusters)
+    plt.xlabel("Number of Clusters (k)")
+    plt.ylabel("silhouette score")
+    plt.show()
+
+
 
 #%%
 
 skeletons = mat["skeldata"]
-base = np.double(data[:,5895:5907])
+base = np.double(features[:,5895:5907])
 frame_num = skeletons[0,:]
 x = skeletons[1::3,:]
 y = skeletons[2::3,:]
@@ -81,20 +124,35 @@ skeletons_c = mat_complete["skeldata"]
 frame_num_c = skeletons[0,:]
 x_c = skeletons[1::3,:]*640
 y_c = skeletons[2::3,:]*360
+x_reduced=[]
+y_reduced=[]
+f_reduced=[]
+for i in range(len(x[0])):
+    points=np.count_nonzero(x[:,i])
+    if points>5:
+        x_reduced.append(x[:,i])
+        y_reduced.append(y[:,i])
+        f_reduced.append(int(frame_num[i]))
 
-
-similar,outliers=findSimilar(base,data,1)
-plotimages(similar,filename)
+sFeatures=np.zeros((5,10482))
+for i in range(10482):
+    sFeatures[0,i]=i
+    sFeatures[1,i]=f_reduced.count(i) #Number of sceletons in frame
+    sFeatures[2,i]=x_reduced[:,i].count()
+# similar,outliers=findSimilar(base,features,1)
+# plotimages(similar,10)
 
 
 #In[]
-fcentered=data-np.mean(data.T)*np.ones(10482)
+
+fcentered=features-np.mean(features.T)*np.ones(10482)
 u, s, v=LNG.svd(fcentered,full_matrices=False)
 sx= np.diag(s)
 v=v.T
 lowdim=sx[0:100,0:100]@v[:,0:100].T
-c=KMeans(n_clusters=20).fit(lowdim.T)
-kmeans = KMeans(n_clusters=20)
+
+c=KMeans(n_clusters=7).fit(lowdim.T)
+kmeans = KMeans(n_clusters=7)
 kmeans.fit(lowdim.T)
 y_kmeans = kmeans.predict(lowdim.T)
 
@@ -104,12 +162,14 @@ plt.scatter(y[:,0],y[:,1],c=y_kmeans,s=10,cmap='viridis')
 
 #%%
 clust=[]
-for i in range(20):
+for i in range(7):
     clust.append(np.argwhere(y_kmeans==i))
-randnr=random.randint(0,19)
-for i in range(16):
-    
-test=clust[randnr]
-randnr=random.randint(0,100)
 
-plotimages(test[randnr:randnr+16,0])
+test=clust[0]
+pics=np.zeros(16)
+for i in range(16):
+    randnr=random.randint(0,len(test))
+    pics[i]=test[randnr]
+
+plotimages(pics,4)
+    
