@@ -1,6 +1,7 @@
 #In[]
 import numpy as np
 from pandas import DataFrame
+import pandas as pd
 import scipy.io as sio
 import cv2 
 from tqdm import tqdm
@@ -69,7 +70,7 @@ def plot_scelframe(frame_nr):
         plt.pause(0.3)
         i+=1
 
-def elbow(clusters):
+def elbow(clusters,lowdim):
     distortions = []
     K = range(1,clusters)
     for k in K:
@@ -109,6 +110,51 @@ def silhouette(clusters,lowdim):
     plt.ylabel("silhouette score")
     plt.show()
 
+def PCA(data):
+    featcentered=sFeatures-np.mean(sFeatures.T)*np.ones(len(sFeatures[0]))
+    u, s, v=LNG.svd(sFeatures,full_matrices=False)
+    sx= np.diag(s)
+    v=v.T
+    lowdim=sx[0:100,0:100]@v[:,0:100].T
+    return lowdim
+
+def tsne(clusters,lowdim):
+    c=KMeans(n_clusters=clusters).fit(lowdim.T)
+    kmeans = KMeans(n_clusters=7)
+    kmeans.fit(lowdim.T)
+    y_kmeans = kmeans.predict(lowdim.T)
+
+    tsne = TSNE(n_components=2)
+    y = tsne.fit_transform(lowdim.T) 
+    plt.scatter(y[:,0],y[:,1],c=y_kmeans,s=10,cmap='viridis')
+    return y_kmeans
+
+def sceletonFeatures(x,y,frame_num):
+    x_reduced=[]
+    y_reduced=[]
+    f_reduced=[]
+    for i in range(len(x[0])):
+        points=np.count_nonzero(x[:,i])
+        if points>5:
+            x_reduced.append(x[:,i])
+            y_reduced.append(y[:,i])
+            f_reduced.append(int(frame_num[i]))
+
+    sFeatures=np.zeros((3,10482))
+    for i in range(10482):
+        
+        sFeatures[0,i]=f_reduced.count(i) #Number of sceletons in frame
+        if sFeatures[0,i]>0:
+            indexes=[element for element, x in enumerate(f_reduced) if x == i]
+            countpoint=0
+            for frame in indexes:
+                countpoint+=np.count_nonzero(x_reduced[frame]) #Total number of sceleton points in a frame
+            sFeatures[1,i]=countpoint
+            sFeatures[2,i]=sFeatures[1,i]/sFeatures[0,i]
+        else:
+            sFeatures[1,i]=0
+            sFeatures[2,i]=0
+    return sFeatures
 
 
 #%%
@@ -124,51 +170,33 @@ skeletons_c = mat_complete["skeldata"]
 frame_num_c = skeletons[0,:]
 x_c = skeletons[1::3,:]*640
 y_c = skeletons[2::3,:]*360
-x_reduced=[]
-y_reduced=[]
-f_reduced=[]
-for i in range(len(x[0])):
-    points=np.count_nonzero(x[:,i])
-    if points>5:
-        x_reduced.append(x[:,i])
-        y_reduced.append(y[:,i])
-        f_reduced.append(int(frame_num[i]))
 
-sFeatures=np.zeros((5,10482))
-for i in range(10482):
-    sFeatures[0,i]=i
-    sFeatures[1,i]=f_reduced.count(i) #Number of sceletons in frame
-    sFeatures[2,i]=x_reduced[:,i].count()
-# similar,outliers=findSimilar(base,features,1)
+sFeatures=sceletonFeatures(x,y,frame_num)
+
+# similar,outliers=findx_reduced[i].count()Similar(base,features,1)
 # plotimages(similar,10)
 
+#%% Analyse required number of clusters
+nrOfClusters=20
+lowdim=PCA(sFeatures) #Do the PCA and lower the dimension to 100
 
-#In[]
+elbow(nrOfClusters,lowdim) #Check dimension with elbow approach 
 
-fcentered=features-np.mean(features.T)*np.ones(10482)
-u, s, v=LNG.svd(fcentered,full_matrices=False)
-sx= np.diag(s)
-v=v.T
-lowdim=sx[0:100,0:100]@v[:,0:100].T
+silhouette(nrOfClusters,lowdim) #Check dimension with silhouette approach
 
-c=KMeans(n_clusters=7).fit(lowdim.T)
-kmeans = KMeans(n_clusters=7)
-kmeans.fit(lowdim.T)
-y_kmeans = kmeans.predict(lowdim.T)
-
-tsne = TSNE(n_components=2)
-y = tsne.fit_transform(lowdim.T) 
-plt.scatter(y[:,0],y[:,1],c=y_kmeans,s=10,cmap='viridis')
+#%% Specify needed cluster and calculate TSNE
+clusters=10
+y_kmeans=tsne(clusters,lowdim) 
 
 #%%
 clust=[]
 for i in range(7):
     clust.append(np.argwhere(y_kmeans==i))
 
-test=clust[0]
+test=clust[3]
 pics=np.zeros(16)
 for i in range(16):
-    randnr=random.randint(0,len(test))
+    randnr=random.randint(0,len(test)-1)
     pics[i]=test[randnr]
 
 plotimages(pics,4)
