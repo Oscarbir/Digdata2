@@ -129,7 +129,7 @@ def tsne(clusters,lowdim):
     plt.scatter(y[:,0],y[:,1],c=y_kmeans,s=10,cmap='viridis')
     return y_kmeans
 
-def sceletonFeatures(x,y,frame_num):
+def sceletonFeatures(x,y,frame_num,scelFrames):
     x_reduced=[]
     y_reduced=[]
     f_reduced=[]
@@ -140,20 +140,22 @@ def sceletonFeatures(x,y,frame_num):
             y_reduced.append(y[:,i])
             f_reduced.append(int(frame_num[i]))
 
-    sFeatures=np.zeros((3,10482))
-    for i in range(10482):
-        
-        sFeatures[0,i]=f_reduced.count(i) #Number of sceletons in frame
-        if sFeatures[0,i]>0:
+    sFeatures=np.zeros((3,len(scelFrames)))
+    j=0
+    for i in scelFrames:
+       
+        sFeatures[0,j]=f_reduced.count(i) #Number of sceletons in frame
+        if sFeatures[0,j]>0:
             indexes=[element for element, x in enumerate(f_reduced) if x == i]
             countpoint=0
             for frame in indexes:
                 countpoint+=np.count_nonzero(x_reduced[frame]) #Total number of sceleton points in a frame
-            sFeatures[1,i]=countpoint
-            sFeatures[2,i]=sFeatures[1,i]/sFeatures[0,i]
+            sFeatures[1,j]=countpoint
+            sFeatures[2,j]=sFeatures[1,j]/sFeatures[0,j]
         else:
-            sFeatures[1,i]=0
-            sFeatures[2,i]=0
+            sFeatures[1,j]=0
+            sFeatures[2,j]=0
+        j=j+1
     return sFeatures
 
 
@@ -164,19 +166,24 @@ base = np.double(features[:,5895:5907])
 frame_num = skeletons[0,:]
 x = skeletons[1::3,:]
 y = skeletons[2::3,:]
-
+scelFrames=list(range(10482))
 
 skeletons_c = mat_complete["skeldata"]
 frame_num_c = skeletons[0,:]
 x_c = skeletons[1::3,:]*640
 y_c = skeletons[2::3,:]*360
-
-sFeatures=sceletonFeatures(x,y,frame_num)
+hist = plt.hist(frame_num,bins=np.shape(features)[1],color='red')
+skel_per_frame = hist[0]
+# indexes of frames with no skeletons
+ind, = np.where(skel_per_frame==0)
+for i in ind:
+    scelFrames.remove(i)
+sFeatures=sceletonFeatures(x,y,frame_num,scelFrames)
 
 # similar,outliers=findx_reduced[i].count()Similar(base,features,1)
 # plotimages(similar,10)
 
-#%% Analyse required number of clusters
+#%% Analyse/find required number of clusters
 nrOfClusters=20
 lowdim=PCA(sFeatures) #Do the PCA and lower the dimension to 100
 
@@ -188,12 +195,12 @@ silhouette(nrOfClusters,lowdim) #Check dimension with silhouette approach
 clusters=10
 y_kmeans=tsne(clusters,lowdim) 
 
-#%%
+#%% Plot random pics from clusters
 clust=[]
 for i in range(7):
     clust.append(np.argwhere(y_kmeans==i))
 
-test=clust[3]
+test=clust[3] #Select cluster
 pics=np.zeros(16)
 for i in range(16):
     randnr=random.randint(0,len(test)-1)
