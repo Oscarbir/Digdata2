@@ -48,16 +48,16 @@ def plotimages(similar,grid,filename):
         i +=1
         plt.axis('off')
 
-def plot_scelframe(frame_nr,frame_num_c,filename,x_c,y_c):
-    get_start_nr = np.argwhere(frame_num_c==frame_nr)
-    i = get_start_nr[0]
+def plot_scelframe(frame_nr,frame_num,f_reduced,filename,x_reduced,y_reduced):
+    get_start_nr=np.argwhere(frame_num==frame_nr)
+    i=get_start_nr[0][0]
     #i=11
-    while frame_num_c[i] == frame_nr:    
+    while f_reduced[i]==frame_nr:    
         cap = cv2.VideoCapture(filename)
-        cap.set(1,int(frame_num_c[i]))
+        cap.set(1,int(f_reduced[i]))
         ret, frame = cap.read()
         plt.imshow(frame)
-        plt.scatter(x_c[:,i],y_c[:,i],c='r')
+        plt.scatter(x_reduced[:][i]*640,y_reduced[:][i]*360,c='r')
         plt.show()
         plt.pause(0.3)
         i+=1
@@ -113,7 +113,7 @@ def PCA(sFeatures):
 
 
 def kmeans_tsne(clusters,lowdim):
-    kmeans = KMeans(n_clusters=7)
+    kmeans = KMeans(n_clusters=clusters)
     kmeans.fit(lowdim.T)
     y_kmeans = kmeans.predict(lowdim.T)
 
@@ -121,7 +121,9 @@ def kmeans_tsne(clusters,lowdim):
     y = tsne.fit_transform(lowdim.T) 
     plt.figure()
     plt.scatter(y[:,0],y[:,1],c=y_kmeans,s=10,cmap='viridis')
-    plt.title('k-means clustering')
+    
+    # legend1 = ax.legend(*scatter.legend_elements(),loc="lower left", title="Classes")
+    # ax.add_artist(legend1)
     return y_kmeans,y
 
 def sceletonFeatures(x,y,frame_num,scelFrames):
@@ -135,7 +137,7 @@ def sceletonFeatures(x,y,frame_num,scelFrames):
             y_reduced.append(y[:,i])
             f_reduced.append(int(frame_num[i]))
 
-    sFeatures=np.zeros((3,len(scelFrames)))
+    sFeatures=np.zeros((4,len(scelFrames)))
     j=0
     for i in scelFrames:
        
@@ -143,12 +145,21 @@ def sceletonFeatures(x,y,frame_num,scelFrames):
         if sFeatures[0,j]>0:
             indexes=[element for element, x in enumerate(f_reduced) if x == i]
             countpoint=0
+            val1=0
             for frame in indexes:
-                countpoint+=np.count_nonzero(x_reduced[frame]) #Total number of sceleton points in a frame
+                count=np.count_nonzero(x_reduced[frame])
+                countpoint+=count #Total number of sceleton points in a frame
+                val1+=sum(x_reduced[frame])/count
+
             sFeatures[1,j]=countpoint
             sFeatures[2,j]=sFeatures[1,j]/sFeatures[0,j]
+            sFeatures[3,j]=val1/len(indexes)
+
         else:
             sFeatures[1,j]=0
             sFeatures[2,j]=0
+            sFeatures[3,j]=0
         j=j+1
-    return sFeatures
+   
+
+    return sFeatures,f_reduced,x_reduced,y_reduced
