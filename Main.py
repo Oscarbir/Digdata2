@@ -17,12 +17,30 @@ from sklearn.metrics import silhouette_samples,silhouette_score
 from sklearn.cluster import SpectralClustering
 import numpy as np
 import matplotlib.style as style
-import functions
+import functions as fu
 mat = sio.loadmat('esqueletosveryslow.mat')
 mat_complete = sio.loadmat('esqueletosveryslow_complete.mat')
 data = sio.loadmat('girosmallveryslow2.mp4_features.mat')
 features = np.double(data['features'])
 filename = "girosmallveryslow2.mp4"
+
+#%% Define functions
+
+
+def tsne(clusters,lowdim):
+    
+    kmeans = KMeans(n_clusters=clusters)
+    kmeans.fit(lowdim.T)
+    y_kmeans = kmeans.predict(lowdim.T)
+
+    tsne = TSNE(n_components=2)
+    y = tsne.fit_transform(lowdim.T) 
+    fig, ax = plt.subplots()
+    scatter=ax.scatter(y[:,0],y[:,1],c=y_kmeans,s=10,cmap='viridis')
+    legend1 = ax.legend(*scatter.legend_elements(),loc="lower left", title="Classes")
+    ax.add_artist(legend1)
+    return y_kmeans
+
 
 
 
@@ -45,7 +63,7 @@ skel_per_frame = hist[0]
 ind, = np.where(skel_per_frame==0)
 for i in ind:
     scelFrames.remove(i)
-sFeatures,f_reduced,x_reduced,y_reduced=sceletonFeatures(x,y,frame_num,scelFrames)
+sFeatures,f_reduced,x_reduced,y_reduced=fu.sceletonFeatures(x,y,frame_num,scelFrames)
 # f_reduced=f_reduced[sFeatures[0,:]!=0]
 # sFeatures=sFeatures[sFeatures!=0]
 # sFeatures=sFeatures.reshape(3,7069)
@@ -53,12 +71,12 @@ sFeatures,f_reduced,x_reduced,y_reduced=sceletonFeatures(x,y,frame_num,scelFrame
 # plotimages(similar,10)
 
 #%% Analyse/find required number of clusters
-nrOfClusters=20
-lowdim=PCA(sFeatures) #Do the PCA and lower the dimension to 100
+nrOfClusters=10
+lowdim=fu.PCA(sFeatures) #Do the PCA and lower the dimension to 100
 
-elbow(nrOfClusters,lowdim) #Check dimension with elbow approach 
+fu.elbow(nrOfClusters,lowdim) #Check dimension with elbow approach 
 
-silhouette(nrOfClusters,lowdim) #Check dimension with silhouette approach
+fu.silhouette(nrOfClusters,lowdim) #Check dimension with silhouette approach
 
 #%% Specify needed cluster and calculate TSNE
 clusters=3
@@ -70,13 +88,13 @@ clust=[]
 for i in range(clusters):
     clust.append(np.argwhere(y_kmeans==i))
 
-test=clust[0] #Select cluster
+test=clust[1] #Select cluster
 pics=np.zeros(64)
 for i in range(64):
     randnr=random.randint(0,len(test)-1)
     pics[i]=scelFrames[int(test[randnr])]
 
-plotimages(pics,8)
+fu.plotimages(pics,8,filename)
 #%%
-plot_scelframe(1,f_reduced)
+fu.plot_scelframe(1,frame_num,f_reduced,filename,x_reduced,y_reduced)
     

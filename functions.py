@@ -15,7 +15,35 @@ from sklearn.manifold import TSNE
 from sklearn.metrics import silhouette_samples,silhouette_score
 import matplotlib.style as style
 #%% Define functions
-
+def outliers_removal(features):
+    # Input: 
+        #features --> feature matrix 512x10482
+    
+    # Output: 
+        # outliers --> indexes of outliers
+        # frames --> indexes of frames we want to keep
+        # new_features --> feature matrix without outliers
+        
+    outliers = []
+    features = np.double(features)
+    cycles = 4
+    for i in range(cycles):
+        #print(i)
+        base = np.delete(features, outliers, axis=1)
+        u, s, v = np.linalg.svd(base)
+        Pi = u[:,0:10]@u[:,0:10].T
+        fn = (np.identity(len(features)) - Pi)@features
+        dn = np.sqrt(np.sum(np.multiply(fn,fn),axis=0))
+        dd = np.sqrt(np.sum(np.multiply(features,features),axis=0))
+        rnull = np.divide(dn,dd)
+        outliers = np.argwhere(rnull>0.6)
+        #print("done")
+    new_frames = np.ones(features.shape[1])
+    new_frames[outliers] = 0
+    frames = np.where(new_frames==1)[0]
+    new_features = np.double(features[:,frames])
+    return(outliers, frames, new_features) 
+    
 def findSimilar(base,data,case):
     u, s, v = linalg.svd(base)
     print(u.shape)
@@ -163,3 +191,4 @@ def sceletonFeatures(x,y,frame_num,scelFrames):
    
 
     return sFeatures,f_reduced,x_reduced,y_reduced
+
